@@ -13,6 +13,8 @@ module Text.Blaze.JSON.Internal
     , double, float
     , text
     , lazyText
+    , utf8
+    , lazyUtf8
     , array', array
     , object', object
     , unsafeObject', unsafeObject
@@ -24,9 +26,7 @@ import Prelude hiding (null)
 #define COMPATIBILITY 1
 #endif
 
-#if COMPATIBILITY
 import qualified Data.ByteString as S
-#endif
 import qualified Data.ByteString.Lazy as L
 
 import qualified Data.ByteString.Builder as B
@@ -173,6 +173,28 @@ escapeAscii html =
         BP.char8 BP.>*< BP.char8 BP.>*< BP.word16HexFixed
 {-# INLINABLE escapeAscii #-}
 
+appendWord8 :: EncodeConfig -> Word8 -> B.Builder -> B.Builder
+appendWord8 cfg = \w b -> BP.primBounded (escapeAscii $ escapeHtml cfg) w <> b
+{-# INLINE appendWord8 #-}
+
+-- | utf8 encoded bytestring to JSON. since v0.2.0.
+--
+-- >>> utf8 $ T.encodeUtf8 "\29483"
+-- "\"\29483\""
+utf8 :: S.ByteString -> JSON
+utf8 t = JSON $ \cfg -> surround "\"" "\"" $
+    S.foldr (appendWord8 cfg) mempty t
+{-# INLINABLE utf8 #-}
+
+-- | utf8 encoded lazy bytestring to JSON. since v0.2.0.
+--
+-- >>> lazyUtf8 $ TL.encodeUtf8 "\29356"
+-- "\"\29356\""
+lazyUtf8 :: L.ByteString -> JSON
+lazyUtf8 t = JSON $ \cfg -> surround "\"" "\"" $
+    L.foldr (appendWord8 cfg) mempty t
+{-# INLINABLE lazyUtf8 #-}
+
 -- | json text value from Text
 --
 -- >>> print $ text "foo\n"
@@ -188,16 +210,8 @@ lazyText :: TL.Text -> JSON
 {-# INLINABLE lazyText #-}
 
 #if COMPATIBILITY
-
-appendWord8 :: EncodeConfig -> Word8 -> B.Builder -> B.Builder
-appendWord8 cfg = \w b -> BP.primBounded (escapeAscii $ escapeHtml cfg) w <> b
-{-# INLINE appendWord8 #-}
-
-text t = JSON $ \cfg -> surround "\"" "\"" $
-    S.foldr (appendWord8 cfg) mempty $ T.encodeUtf8 t
-
-lazyText t = JSON $ \cfg -> surround "\"" "\"" $
-    L.foldr (appendWord8 cfg) mempty $ TL.encodeUtf8 t
+text = utf8 . T.encodeUtf8
+lazyText = lazyUtf8 . TL.encodeUtf8
 #else
 
 encodeString :: (BP.BoundedPrim Word8 -> a -> B.Builder) -> Bool -> a -> B.Builder

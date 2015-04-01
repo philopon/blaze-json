@@ -17,7 +17,7 @@ module Text.Blaze.JSON
       -- ** number
     , integral, double
       -- ** string
-    , text, lazyText
+    , text, lazyText, utf8, lazyUtf8
       -- ** array
     , array
       -- ** object
