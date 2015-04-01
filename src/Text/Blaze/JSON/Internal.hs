@@ -152,14 +152,14 @@ double = unsafeToJSON . B.doubleDec
 
 escapeAscii :: Bool -> BP.BoundedPrim Word8
 escapeAscii html =
+    BP.condB (\w -> html && w == c2w '<') (BP.liftFixedToBounded hexEscape) $
+    BP.condB (\w -> html && w == c2w '>') (BP.liftFixedToBounded hexEscape) $
     BP.condB (== c2w '\\' ) (ascii2 ('\\','\\')) $
     BP.condB (== c2w '\"' ) (ascii2 ('\\','"' )) $
     BP.condB (>= c2w '\x20') (BP.liftFixedToBounded BP.word8) $
     BP.condB (== c2w '\n' ) (ascii2 ('\\','n' )) $
     BP.condB (== c2w '\r' ) (ascii2 ('\\','r' )) $
     BP.condB (== c2w '\t' ) (ascii2 ('\\','t' )) $
-    BP.condB (\w -> html && w == c2w '<') (BP.liftFixedToBounded hexEscape) $
-    BP.condB (\w -> html && w == c2w '>') (BP.liftFixedToBounded hexEscape) $
     (BP.liftFixedToBounded hexEscape) -- fallback for chars < 0x20
   where
 
