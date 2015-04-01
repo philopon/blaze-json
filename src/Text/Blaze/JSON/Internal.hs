@@ -54,21 +54,28 @@ import qualified Data.Set as Set
 newtype JSON = JSON { unJSON :: EncodeConfig -> B.Builder }
     deriving(Typeable)
 
+-- | >>> def :: EncodeConfig
+-- EncodeConfig {escapeHtml = False}
 newtype EncodeConfig = EncodeConfig
-    { escapeHtml :: Bool
+    { escapeHtml :: Bool -- ^ escape &lt; and &gt; to \\uXXXX.
     } deriving Show
 
 instance Default EncodeConfig where
     def = EncodeConfig False
     {-# INLINABLE def #-}
 
+-- | convert JSON to bytestring Builder.
 toBuilder :: EncodeConfig -> JSON -> B.Builder
 toBuilder = flip unJSON
 {-# INLINABLE toBuilder #-}
 
+-- | encode JSON using given config
 encodeWith :: EncodeConfig -> JSON -> L.ByteString
 encodeWith cfg = B.toLazyByteString . toBuilder cfg
 
+-- | @
+-- encode = encodeWith def
+-- @
 encode :: JSON -> L.ByteString
 encode = encodeWith def
 {-# INLINABLE encode #-}
@@ -243,6 +250,10 @@ array' f a = JSON $ \cfg -> surround bra ket $
     ket = B.char8 ']'
 {-# INLINABLE array' #-}
 
+-- | convert to json array
+--
+-- >>> array [integral 4, bool True]
+-- "[4,true]"
 array :: F.Foldable f => f JSON -> JSON
 array = array' id
 {-# INLINABLE array #-}
