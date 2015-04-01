@@ -15,7 +15,7 @@ import qualified Data.HashMap.Strict as H
 import qualified Text.Blaze.JSON as B
 
 config :: B.EncodeConfig
-#if MIN_VERSION_aeson(8,0,0)
+#if MIN_VERSION_aeson(0,8,0)
 config = B.def
 #else
 config = B.def { B.escapeHtml = True }

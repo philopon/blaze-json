@@ -20,10 +20,6 @@ module Text.Blaze.JSON.Internal
 
 import Prelude hiding (null)
 
-#ifndef MIN_VERSION_bytestring
-#define MIN_VERSION_bytestring(x,y,z) 1
-#endif
-
 #if !MIN_VERSION_bytestring(0,10,4)
 #define COMPATIBILITY 1
 #endif
