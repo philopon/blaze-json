@@ -2,9 +2,3 @@ language: haskell
 ghc:
   - 7.8
   - 7.6
-install:
-  - cabal install cabal-install
-  - export PATH=$HOME/.cabal/bin:$PATH
-  - cabal --version
-  - cabal sandbox init
-  - cabal install --only-dependencies --force-reinstalls --enable-tests
