@@ -31,6 +31,7 @@ import qualified Data.Text.Lazy.Builder.RealFloat as BF
 import Data.Default.Class(Default(..))
 
 import Data.Word
+import Data.Monoid
 import Data.Typeable
 import qualified Data.Char as Char
 import qualified Data.Set as Set
@@ -164,7 +165,7 @@ realFloat = unsafeToJSON . BF.realFloat
 {-# INLINABLE realFloat #-}
 
 surround :: B.Builder -> B.Builder -> B.Builder -> B.Builder
-surround pre suf bdy = pre `mappend` bdy `mappend` suf
+surround pre suf bdy = pre <> bdy <> suf
 
 dblQuote :: B.Builder -> B.Builder
 dblQuote = surround q q
@@ -177,7 +178,7 @@ dblQuote = surround q q
 -- "\"foo\\n\""
 text :: T.Text -> JSON
 text t = JSON $ \EncodeConfig{..} -> dblQuote $
-    T.foldr (\c b -> escape isEscape c `mappend` b) mempty t
+    T.foldr (\c b -> escape isEscape c <> b) mempty t
 {-# INLINABLE text #-}
 
 -- | json text value from LazyText
@@ -186,7 +187,7 @@ text t = JSON $ \EncodeConfig{..} -> dblQuote $
 -- "\"bar\\u0000\""
 lazyText :: L.Text -> JSON
 lazyText t = JSON $ \EncodeConfig{..} -> dblQuote $
-    L.foldr (\c b -> escape isEscape c `mappend` b) mempty t
+    L.foldr (\c b -> escape isEscape c <> b) mempty t
 {-# INLINABLE lazyText #-}
 
 -- | json text value from String
@@ -195,13 +196,13 @@ lazyText t = JSON $ \EncodeConfig{..} -> dblQuote $
 -- "\"baz\\\\\""
 string :: F.Foldable f => f Char -> JSON
 string s = JSON $ \EncodeConfig{..} -> dblQuote $
-    F.foldr (\c b -> escape isEscape c `mappend` b) mempty s
+    F.foldr (\c b -> escape isEscape c <> b) mempty s
 {-# INLINABLE string #-}
 
 intersperse :: (F.Foldable f, Monoid m) => (a -> m) -> m -> f a -> m
 intersperse f s a = F.foldr go (\n _ -> n) a mempty id
   where
-    go i g = \_ j -> g (j $ f i) (\b -> j $ f i `mappend` s `mappend` b)
+    go i g = \_ j -> g (j $ f i) (\b -> j $ f i <> s <> b)
 
 array' :: F.Foldable f => (a -> JSON) -> f a -> JSON
 array' f a = JSON $ \cfg -> surround bra ket $
@@ -219,7 +220,7 @@ unsafeObject' kf vf o = JSON $ \cfg -> surround curly brace $
     brace = word16 $ ord '}'
     colon = word16 $ ord ':'
     kv cfg (k, v) =
-        unJSON (text $ kf k) cfg `mappend` colon `mappend` unJSON (vf v) cfg
+        unJSON (text $ kf k) cfg <> colon <> unJSON (vf v) cfg
 {-# INLINABLE unsafeObject' #-}
 
 object' :: F.Foldable f => (k -> T.Text) -> (a -> JSON) -> f (k, a) -> JSON
