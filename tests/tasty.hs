@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 import Control.Monad
 
 import Test.QuickCheck
@@ -11,6 +13,14 @@ import qualified Data.Vector as V
 import qualified Data.HashMap.Strict as H
 
 import qualified Text.Blaze.JSON as B
+
+config :: B.EncodeConfig
+#if MIN_VERSION_aeson(8,0,0)
+config = B.def
+#else
+config = B.def { B.escapeHtml = True }
+#endif
+
 
 fromAeson :: A.Value -> B.JSON
 fromAeson (A.Object o) = B.object . map (fmap fromAeson) $ H.toList o
@@ -52,11 +62,13 @@ arbit d = oneof
         fmap (A.Object . H.fromList) $ vectorOf l ((,) `fmap` text `ap` arbit (d-1))
     ]
 
-instance Arbitrary A.Value where
-    arbitrary = arbit 2
+newtype Aeson = Aeson A.Value deriving Show
+
+instance Arbitrary Aeson where
+    arbitrary = Aeson `fmap` arbit 2
 
 main :: IO ()
 main = defaultMain $ testGroup ""
-    [ testProperty "same to aeson" $ \value ->
-        A.encode value === B.encode (fromAeson value)
+    [ testProperty "same to aeson" $ \(Aeson value) ->
+        A.encode value === B.encodeWith config (fromAeson value)
     ]

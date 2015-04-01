@@ -1,8 +1,12 @@
 module Text.Blaze.JSON
     ( JSON
+      -- * configuration
+    , EncodeConfig(..)
+    , def
 
       -- * convert
     , toBuilder
+    , encodeWith
     , encode
 
       -- * constructors
@@ -27,3 +31,4 @@ import Prelude hiding (null)
 
 import Text.Blaze.JSON.Internal
 import Text.Blaze.JSON.Class
+import Data.Default.Class

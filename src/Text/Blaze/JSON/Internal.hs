@@ -1,9 +1,11 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE CPP #-}
 
 module Text.Blaze.JSON.Internal
-    ( JSON(..), encode
+    ( JSON(..), toBuilder, encodeWith, encode
+    , EncodeConfig(..)
     , unsafeToJSON
     , bool
     , null
@@ -18,6 +20,17 @@ module Text.Blaze.JSON.Internal
 
 import Prelude hiding (null)
 
+#ifndef MIN_VERSION_bytestring
+#define MIN_VERSION_bytestring(x,y,z) 1
+#endif
+
+#if !MIN_VERSION_bytestring(0,10,4)
+#define COMPATIBILITY 1
+#endif
+
+#if COMPATIBILITY
+import qualified Data.ByteString as S
+#endif
 import qualified Data.ByteString.Lazy as L
 
 import qualified Data.ByteString.Builder as B
@@ -29,6 +42,7 @@ import Data.Monoid
 
 import Data.Word
 import Data.Char(ord)
+import Data.Default.Class
 
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -41,11 +55,26 @@ import qualified Data.Set as Set
 -- >>> :set -XOverloadedStrings
 
 -- | JSON encoding data type
-newtype JSON = JSON { toBuilder :: B.Builder }
+newtype JSON = JSON { unJSON :: EncodeConfig -> B.Builder }
     deriving(Typeable)
 
+newtype EncodeConfig = EncodeConfig
+    { escapeHtml :: Bool
+    } deriving Show
+
+instance Default EncodeConfig where
+    def = EncodeConfig False
+    {-# INLINABLE def #-}
+
+toBuilder :: EncodeConfig -> JSON -> B.Builder
+toBuilder = flip unJSON
+{-# INLINABLE toBuilder #-}
+
+encodeWith :: EncodeConfig -> JSON -> L.ByteString
+encodeWith cfg = B.toLazyByteString . toBuilder cfg
+
 encode :: JSON -> L.ByteString
-encode = B.toLazyByteString . toBuilder
+encode = encodeWith def
 {-# INLINABLE encode #-}
 
 instance Eq JSON where
@@ -75,7 +104,7 @@ ascii5 cs = BP.liftFixedToBounded $ (const cs) BP.>$<
 {-# INLINE ascii5 #-}
 
 unsafeToJSON :: B.Builder -> JSON
-unsafeToJSON = JSON
+unsafeToJSON = JSON . const
 {-# INLINE unsafeToJSON #-}
 
 -- | json null value
@@ -121,33 +150,31 @@ double :: Double -> JSON
 double = unsafeToJSON . B.doubleDec
 {-# INLINABLE double #-}
 
-encodeString :: (BP.BoundedPrim Word8 -> a -> B.Builder) -> a -> B.Builder
-encodeString encodeUtf8BuilderEscaped t =
-    B.char8 '"' <> encodeUtf8BuilderEscaped escapeAscii t <> B.char8 '"'
+escapeAscii :: Bool -> BP.BoundedPrim Word8
+escapeAscii html =
+    BP.condB (== c2w '\\' ) (ascii2 ('\\','\\')) $
+    BP.condB (== c2w '\"' ) (ascii2 ('\\','"' )) $
+    BP.condB (>= c2w '\x20') (BP.liftFixedToBounded BP.word8) $
+    BP.condB (== c2w '\n' ) (ascii2 ('\\','n' )) $
+    BP.condB (== c2w '\r' ) (ascii2 ('\\','r' )) $
+    BP.condB (== c2w '\t' ) (ascii2 ('\\','t' )) $
+    BP.condB (\w -> html && w == c2w '<') (BP.liftFixedToBounded hexEscape) $
+    BP.condB (\w -> html && w == c2w '>') (BP.liftFixedToBounded hexEscape) $
+    (BP.liftFixedToBounded hexEscape) -- fallback for chars < 0x20
   where
-    escapeAscii :: BP.BoundedPrim Word8
-    escapeAscii =
-        BP.condB (== c2w '\\' ) (ascii2 ('\\','\\')) $
-        BP.condB (== c2w '\"' ) (ascii2 ('\\','"' )) $
-        BP.condB (>= c2w '\x20') (BP.liftFixedToBounded BP.word8) $
-        BP.condB (== c2w '\n' ) (ascii2 ('\\','n' )) $
-        BP.condB (== c2w '\r' ) (ascii2 ('\\','r' )) $
-        BP.condB (== c2w '\t' ) (ascii2 ('\\','t' )) $
-        (BP.liftFixedToBounded hexEscape) -- fallback for chars < 0x20
 
     c2w = fromIntegral . ord
 
     hexEscape :: BP.FixedPrim Word8
     hexEscape = (\c -> ('\\', ('u', fromIntegral c))) BP.>$<
         BP.char8 BP.>*< BP.char8 BP.>*< BP.word16HexFixed
-{-# INLINABLE encodeString #-}
+{-# INLINABLE escapeAscii #-}
 
 -- | json text value from Text
 --
 -- >>> print $ text "foo\n"
 -- "\"foo\\n\""
 text :: T.Text -> JSON
-text = JSON . encodeString T.encodeUtf8BuilderEscaped
 {-# INLINABLE text #-}
 
 -- | json text value from LazyText
@@ -155,8 +182,31 @@ text = JSON . encodeString T.encodeUtf8BuilderEscaped
 -- >>> print $ lazyText "bar\0"
 -- "\"bar\\u0000\""
 lazyText :: TL.Text -> JSON
-lazyText = JSON . encodeString TL.encodeUtf8BuilderEscaped
 {-# INLINABLE lazyText #-}
+
+#if COMPATIBILITY
+
+appendWord8 :: EncodeConfig -> Word8 -> B.Builder -> B.Builder
+appendWord8 cfg = \w b -> BP.primBounded (escapeAscii $ escapeHtml cfg) w <> b
+{-# INLINE appendWord8 #-}
+
+text t = JSON $ \cfg -> surround "\"" "\"" $
+    S.foldr (appendWord8 cfg) mempty $ T.encodeUtf8 t
+
+lazyText t = JSON $ \cfg -> surround "\"" "\"" $
+    L.foldr (appendWord8 cfg) mempty $ TL.encodeUtf8 t
+#else
+
+encodeString :: (BP.BoundedPrim Word8 -> a -> B.Builder) -> Bool -> a -> B.Builder
+encodeString encodeUtf8BuilderEscaped html = \t ->
+    B.char8 '"' <> encodeUtf8BuilderEscaped (escapeAscii html) t <> B.char8 '"'
+{-# INLINABLE encodeString #-}
+text t = JSON $ \cfg ->
+    encodeString T.encodeUtf8BuilderEscaped (escapeHtml cfg) t
+
+lazyText t = JSON $ \cfg ->
+    encodeString TL.encodeUtf8BuilderEscaped (escapeHtml cfg) t
+#endif
 
 intersperse :: (F.Foldable f, Monoid m) => (a -> m) -> m -> f a -> m
 intersperse f s a = F.foldr go (\n _ -> n) a mempty id
@@ -169,12 +219,14 @@ surround pre suf bdy = pre <> bdy <> suf
 {-# INLINABLE surround #-}
 
 unsafeObject' :: F.Foldable f => (k -> T.Text) -> (a -> JSON) -> f (k, a) -> JSON
-unsafeObject' kf vf = JSON . surround curly brace . intersperse keyValue (B.char8 ',')
+unsafeObject' kf vf a = JSON $ \cfg ->
+    surround curly brace $ intersperse (keyValue cfg) (B.char8 ',') a
   where
     curly = B.char8 '{'
     brace = B.char8 '}'
     colon = B.char8 ':'
-    keyValue (k, v) = toBuilder (text $ kf k) <> colon <> toBuilder (vf v)
+    keyValue cfg (k, v) =
+        unJSON (text $ kf k) cfg <> colon <> unJSON (vf v) cfg
 {-# INLINABLE unsafeObject' #-}
 
 object' :: F.Foldable f => (k -> T.Text) -> (a -> JSON) -> f (k, a) -> JSON
@@ -188,8 +240,8 @@ object' kf vf a = unsafeObject' id vf $
 {-# INLINABLE object' #-}
 
 array' :: F.Foldable f => (a -> JSON) -> f a -> JSON
-array' f = JSON . surround bra ket .
-    intersperse (toBuilder . f) (B.char8 ',')
+array' f a = JSON $ \cfg -> surround bra ket $
+    intersperse (toBuilder cfg . f) (B.char8 ',') a
   where
     bra = B.char8 '['
     ket = B.char8 ']'
