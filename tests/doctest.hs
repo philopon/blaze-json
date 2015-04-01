@@ -3,6 +3,6 @@ main :: IO ()
 main = doctest
     [ "-isrc"
     , "-optP-include"
-    , "optPdist/build/autogen/cabal_macros.h"
+    , "-optPdist/build/autogen/cabal_macros.h"
     , "src/Text/Blaze/JSON.hs"
     ]

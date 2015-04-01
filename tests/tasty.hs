@@ -47,8 +47,8 @@ scolar :: Gen A.Value
 scolar = oneof
      [ return A.Null
      , A.Bool `fmap` arbitrary
-     , (A.Number . fromIntegral) `fmap` (arbitrary :: Gen Int)
-     , A.Number `fmap` suchThat (fromFloatDigits `fmap` (arbitrary :: Gen Double)) isFloating
+     , (A.Number . normalize . fromIntegral) `fmap` (arbitrary :: Gen Int)
+     , (A.Number . normalize . fromFloatDigits) `fmap` (arbitrary :: Gen Double)
      , fmap A.String text
      ]
 
