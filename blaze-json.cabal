@@ -1,5 +1,5 @@
 name:                blaze-json
-version:             0.1.0
+version:             0.2.0
 synopsis:            tiny library for encoding json
 license:             MIT
 license-file:        LICENSE
