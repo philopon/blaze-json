@@ -49,7 +49,7 @@ instance ToJSON () where
     {-# INLINE toJSON #-}
 
 instance ToJSON [Char] where
-    toJSON = string
+    toJSON = text . T.pack
     {-# INLINE toJSON #-}
 
 instance ToJSON Char where
@@ -57,11 +57,11 @@ instance ToJSON Char where
     {-# INLINE toJSON #-}
 
 instance ToJSON Double where
-    toJSON = realFloat
+    toJSON = double
     {-# INLINE toJSON #-}
 
 instance ToJSON Float where
-    toJSON = realFloat
+    toJSON = float
     {-# INLINE toJSON #-}
 
 instance ToJSON Int where

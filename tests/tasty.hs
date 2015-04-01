@@ -16,7 +16,7 @@ fromAeson :: A.Value -> B.JSON
 fromAeson (A.Object o) = B.object . map (fmap fromAeson) $ H.toList o
 fromAeson (A.Array  a) = B.array $ fmap fromAeson a
 fromAeson (A.String t) = B.text t
-fromAeson (A.Number n) = either B.realFloat B.integral (floatingOrInteger n :: Either Double Int)
+fromAeson (A.Number n) = either B.double B.integral (floatingOrInteger n :: Either Double Int)
 fromAeson (A.Bool   b) = B.bool b
 fromAeson A.Null       = B.null
 
