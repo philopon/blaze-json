@@ -25,8 +25,8 @@ text = sized $ \n -> do
     k <- choose (0, n)
     s <- sequence
         [ oneof
-            [ oneof $ map pure "\\\""
-            , oneof $ map pure ['\0' .. '\x20']
+            [ oneof $ map return "\\\""
+            , oneof $ map return ['\0' .. '\x20']
             , toEnum `fmap` choose (0, 0xffff)
             ]
         | _ <- [1 .. k]
