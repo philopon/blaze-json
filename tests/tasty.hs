@@ -46,11 +46,11 @@ text = sized $ \n -> do
 scolar :: Gen A.Value
 scolar = oneof
      [ return A.Null
-    , A.Bool `fmap` arbitrary
-    , (A.Number . fromIntegral) `fmap` (arbitrary :: Gen Int)
-    , (A.Number . fromFloatDigits) `fmap` (arbitrary :: Gen Double)
-    , fmap A.String text
-    ]
+     , A.Bool `fmap` arbitrary
+     , (A.Number . fromIntegral) `fmap` (arbitrary :: Gen Int)
+     , A.Number `fmap` suchThat (fromFloatDigits `fmap` (arbitrary :: Gen Double)) isFloating
+     , fmap A.String text
+     ]
 
 arbit :: Int -> Gen A.Value
 arbit 0 = scolar
