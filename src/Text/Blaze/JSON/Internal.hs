@@ -173,17 +173,13 @@ escapeAscii html =
         BP.char8 BP.>*< BP.char8 BP.>*< BP.word16HexFixed
 {-# INLINABLE escapeAscii #-}
 
-appendWord8 :: EncodeConfig -> Word8 -> B.Builder -> B.Builder
-appendWord8 cfg = \w b -> BP.primBounded (escapeAscii $ escapeHtml cfg) w <> b
-{-# INLINE appendWord8 #-}
-
 -- | utf8 encoded bytestring to JSON. since v0.2.0.
 --
 -- >>> utf8 $ T.encodeUtf8 "\29483"
 -- "\"\29483\""
 utf8 :: S.ByteString -> JSON
 utf8 t = JSON $ \cfg -> surround "\"" "\"" $
-    S.foldr (appendWord8 cfg) mempty t
+    BP.primMapByteStringBounded (escapeAscii $ escapeHtml cfg) t
 {-# INLINABLE utf8 #-}
 
 -- | utf8 encoded lazy bytestring to JSON. since v0.2.0.
@@ -192,7 +188,7 @@ utf8 t = JSON $ \cfg -> surround "\"" "\"" $
 -- "\"\29356\""
 lazyUtf8 :: L.ByteString -> JSON
 lazyUtf8 t = JSON $ \cfg -> surround "\"" "\"" $
-    L.foldr (appendWord8 cfg) mempty t
+    BP.primMapLazyByteStringBounded (escapeAscii $ escapeHtml cfg) t
 {-# INLINABLE lazyUtf8 #-}
 
 -- | json text value from Text
